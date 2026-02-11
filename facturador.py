@@ -1,8 +1,8 @@
 """
-Software de Facturación para España - Versión 2.0
-Gestión completa: Presupuestos → Albaranes → Facturas
+Software de Facturación para España - Versión 3.0
+Modelo basado en VENTAS: cada venta agrupa presupuesto, albarán y factura.
 
-Cumple con los requisitos legales según la normativa española vigente (2025)
+Cumple con los requisitos legales según la normativa española vigente
 - Ley 58/2003 General Tributaria
 - Real Decreto 1619/2012 (Reglamento de Facturación)
 """
@@ -14,11 +14,6 @@ import os
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
-# Tema moderno para la interfaz
-# Nota: ttkthemes está disponible pero los temas nativos de ttk son más rápidos
-# Usamos ttk.Style con temas nativos (clam, vista, winnative)
-
-# Módulos propios
 from database import Database
 from pdf_generator import GeneradorPDF
 
@@ -28,9 +23,7 @@ DOCUMENTOS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Docum
 
 def obtener_ruta_documento(tipo, numero):
     """Genera la ruta organizada para guardar un PDF.
-    
     Estructura: Documentos/<Tipo>/<Año>/<archivo>.pdf
-    Ejemplo:    Documentos/Facturas/2026/Factura_A-2026-0001.pdf
     """
     carpetas_tipo = {
         'presupuesto': 'Presupuestos',
@@ -47,6 +40,10 @@ def obtener_ruta_documento(tipo, numero):
     return os.path.join(directorio, nombre_archivo)
 
 
+# =============================================================================
+# CONFIGURACIÓN
+# =============================================================================
+
 class ConfigManager:
     """Gestiona la configuración del emisor y facturas"""
     
@@ -55,11 +52,9 @@ class ConfigManager:
         self.config = self.cargar_config()
     
     def cargar_config(self):
-        """Carga la configuración desde archivo JSON"""
         if os.path.exists(self.config_path):
             with open(self.config_path, 'r', encoding='utf-8') as f:
                 config = json.load(f)
-                # Asegurar campos nuevos
                 if 'iban' not in config.get('emisor', {}):
                     config['emisor']['iban'] = ''
                 if 'irpf_por_defecto' not in config:
@@ -72,32 +67,27 @@ class ConfigManager:
         return self.config_por_defecto()
     
     def config_por_defecto(self):
-        """Retorna configuración por defecto"""
         return {
             "emisor": {
-                "nombre": "",
-                "nif": "",
-                "direccion": "",
-                "codigo_postal": "",
-                "ciudad": "",
-                "provincia": "",
-                "email": "",
-                "telefono": "",
-                "iban": ""
+                "nombre": "", "nif": "", "direccion": "",
+                "codigo_postal": "", "ciudad": "", "provincia": "",
+                "email": "", "telefono": "", "iban": ""
             },
             "serie_factura": "A",
             "serie_presupuesto": "P",
             "serie_albaran": "AL",
-            "ultimo_numero": 0,
             "iva_por_defecto": 21,
             "irpf_por_defecto": 0
         }
     
     def guardar_config(self):
-        """Guarda la configuración en archivo JSON"""
         with open(self.config_path, 'w', encoding='utf-8') as f:
             json.dump(self.config, f, indent=4, ensure_ascii=False)
 
+
+# =============================================================================
+# VENTANA DE CONFIGURACIÓN
+# =============================================================================
 
 class VentanaConfiguracion(tk.Toplevel):
     """Ventana para configurar los datos del emisor"""
@@ -116,8 +106,6 @@ class VentanaConfiguracion(tk.Toplevel):
         self.grab_set()
     
     def crear_widgets(self):
-        """Crea los widgets de la ventana"""
-        # Canvas con scroll
         canvas = tk.Canvas(self)
         scrollbar = ttk.Scrollbar(self, orient="vertical", command=canvas.yview)
         frame = ttk.Frame(canvas, padding="20")
@@ -129,11 +117,9 @@ class VentanaConfiguracion(tk.Toplevel):
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
-        # Título
         ttk.Label(frame, text="Datos del Emisor (Tu empresa/autónomo)", 
                   font=('Helvetica', 12, 'bold')).grid(row=0, column=0, columnspan=2, pady=(0, 20))
         
-        # Campos del emisor
         campos = [
             ("Nombre/Razón Social:", "nombre"),
             ("NIF/CIF:", "nif"),
@@ -154,12 +140,12 @@ class VentanaConfiguracion(tk.Toplevel):
             entry.grid(row=i+1, column=1, sticky='w', pady=5)
             self.entries[campo] = entry
         
-        # Separador
-        ttk.Separator(frame, orient='horizontal').grid(row=len(campos)+1, column=0, columnspan=2, sticky='ew', pady=15)
+        ttk.Separator(frame, orient='horizontal').grid(
+            row=len(campos)+1, column=0, columnspan=2, sticky='ew', pady=15)
         
-        # Configuración de series
         ttk.Label(frame, text="Configuración de Series y Valores por Defecto", 
-                  font=('Helvetica', 10, 'bold')).grid(row=len(campos)+2, column=0, columnspan=2, pady=(0, 10))
+                  font=('Helvetica', 10, 'bold')).grid(
+            row=len(campos)+2, column=0, columnspan=2, pady=(0, 10))
         
         row_base = len(campos) + 3
         
@@ -183,11 +169,9 @@ class VentanaConfiguracion(tk.Toplevel):
         self.entry_irpf = ttk.Entry(frame, width=10)
         self.entry_irpf.grid(row=row_base+4, column=1, sticky='w', pady=5)
         
-        # Nota de ayuda en fila separada para evitar overlap
         ttk.Label(frame, text="(Ej: 15 para autónomos, 7 para nuevos autónomos)", 
-                  font=('Segoe UI', 8)).grid(row=row_base+5, column=0, columnspan=2, sticky='w', padx=10, pady=(0, 5))
+                  font=('Segoe UI', 8)).grid(row=row_base+5, column=0, columnspan=2, sticky='w', padx=10)
         
-        # Botones
         frame_botones = ttk.Frame(frame)
         frame_botones.grid(row=row_base+7, column=0, columnspan=2, pady=20)
         
@@ -195,11 +179,9 @@ class VentanaConfiguracion(tk.Toplevel):
         ttk.Button(frame_botones, text="Cancelar", command=self.destroy).pack(side=tk.LEFT, padx=10)
     
     def cargar_datos(self):
-        """Carga los datos existentes en los campos"""
         emisor = self.config_manager.config.get("emisor", {})
         for campo, entry in self.entries.items():
-            valor = emisor.get(campo, "")
-            entry.insert(0, valor)
+            entry.insert(0, emisor.get(campo, ""))
         
         self.entry_serie_factura.insert(0, self.config_manager.config.get("serie_factura", "A"))
         self.entry_serie_presupuesto.insert(0, self.config_manager.config.get("serie_presupuesto", "P"))
@@ -208,7 +190,6 @@ class VentanaConfiguracion(tk.Toplevel):
         self.entry_irpf.insert(0, str(self.config_manager.config.get("irpf_por_defecto", 0)))
     
     def guardar(self):
-        """Guarda la configuración"""
         nif = self.entries['nif'].get().strip()
         if not nif:
             messagebox.showerror("Error", "El NIF/CIF es obligatorio")
@@ -236,22 +217,31 @@ class VentanaConfiguracion(tk.Toplevel):
         self.destroy()
 
 
-class VentanaHistorial(tk.Toplevel):
-    """Ventana para ver el historial de documentos"""
+# =============================================================================
+# VENTANA DE VENTAS (HISTORIAL)
+# =============================================================================
+
+class VentanaVentas(tk.Toplevel):
+    """Ventana principal de gestión de ventas"""
     
-    def __init__(self, parent, db, tipo_filtro=None):
+    ESTADOS_DISPLAY = {
+        'borrador': '📝 Borrador',
+        'presupuestado': '📋 Presupuestado',
+        'aceptado': '✅ Aceptado',
+        'rechazado': '❌ Rechazado',
+        'albaranado': '📦 Albaranado',
+        'facturado': '🧾 Facturado',
+        'pagado': '💰 Pagado'
+    }
+    
+    def __init__(self, parent, db, filtro_estado=None):
         super().__init__(parent)
         self.parent = parent
         self.db = db
-        self.tipo_filtro = tipo_filtro
+        self.filtro_estado = filtro_estado
         
-        titulo = "Historial"
-        if tipo_filtro:
-            titulos = {'presupuesto': 'Presupuestos', 'albaran': 'Albaranes', 'factura': 'Facturas'}
-            titulo = f"Historial de {titulos.get(tipo_filtro, tipo_filtro)}"
-        
-        self.title(titulo)
-        self.geometry("900x500")
+        self.title("Gestión de Ventas")
+        self.geometry("1050x550")
         
         self.crear_widgets()
         self.cargar_datos()
@@ -259,68 +249,80 @@ class VentanaHistorial(tk.Toplevel):
         self.transient(parent)
     
     def crear_widgets(self):
-        """Crea los widgets de la ventana"""
         # === FILTROS (arriba) ===
         frame_filtros = ttk.Frame(self, padding=(10, 10, 10, 5))
         frame_filtros.pack(fill=tk.X, side=tk.TOP)
         
-        ttk.Label(frame_filtros, text="Tipo:").pack(side=tk.LEFT, padx=5)
-        self.combo_tipo = ttk.Combobox(frame_filtros, width=15, 
-                                        values=['Todos', 'Presupuesto', 'Albarán', 'Factura'])
-        if self.tipo_filtro:
-            tipos_map = {'presupuesto': 'Presupuesto', 'albaran': 'Albarán', 'factura': 'Factura'}
-            self.combo_tipo.set(tipos_map.get(self.tipo_filtro, 'Todos'))
-        else:
-            self.combo_tipo.set('Todos')
-        self.combo_tipo.pack(side=tk.LEFT, padx=5)
-        self.combo_tipo.bind('<<ComboboxSelected>>', lambda e: self.cargar_datos())
+        ttk.Label(frame_filtros, text="Estado:").pack(side=tk.LEFT, padx=5)
+        estados = ['Todos', 'Borrador', 'Presupuestado', 'Aceptado', 'Albaranado', 'Facturado', 'Pagado']
+        self.combo_estado = ttk.Combobox(frame_filtros, width=15, values=estados, state='readonly')
         
-        ttk.Button(frame_filtros, text="Actualizar", command=self.cargar_datos).pack(side=tk.LEFT, padx=20)
+        if self.filtro_estado:
+            self.combo_estado.set(self.filtro_estado.capitalize())
+        else:
+            self.combo_estado.set('Todos')
+        self.combo_estado.pack(side=tk.LEFT, padx=5)
+        self.combo_estado.bind('<<ComboboxSelected>>', lambda e: self.cargar_datos())
+        
+        ttk.Button(frame_filtros, text="🔄 Actualizar", command=self.cargar_datos).pack(side=tk.LEFT, padx=15)
         
         # === BOTONES DE ACCIÓN (abajo) ===
         frame_inferior = ttk.Frame(self, padding=(10, 5, 10, 10))
         frame_inferior.pack(fill=tk.X, side=tk.BOTTOM)
         
-        # Nota informativa
-        ttk.Label(frame_inferior, text="💡 Doble clic en un documento para ver su PDF", 
+        ttk.Label(frame_inferior, text="💡 Doble clic para ver detalles de la venta", 
                   font=('Segoe UI', 9), foreground='gray').pack(anchor='w', pady=(0, 5))
         
         frame_acciones = ttk.Frame(frame_inferior)
         frame_acciones.pack(fill=tk.X)
         
-        ttk.Label(frame_acciones, text="Acciones:", font=('Segoe UI', 10, 'bold')).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Label(frame_acciones, text="Documentos:", 
+                  font=('Segoe UI', 10, 'bold')).pack(side=tk.LEFT, padx=(0, 8))
         
-        ttk.Button(frame_acciones, text="📄 Ver PDF", 
-                   command=self.generar_pdf).pack(side=tk.LEFT, padx=3)
+        ttk.Button(frame_acciones, text="📋 Presupuesto", 
+                   command=lambda: self.generar_documento('presupuesto')).pack(side=tk.LEFT, padx=3)
+        ttk.Button(frame_acciones, text="📦 Albarán", 
+                   command=lambda: self.generar_documento('albaran')).pack(side=tk.LEFT, padx=3)
+        ttk.Button(frame_acciones, text="🧾 Factura", 
+                   command=lambda: self.generar_documento('factura')).pack(side=tk.LEFT, padx=3)
+        
+        ttk.Separator(frame_acciones, orient='vertical').pack(side=tk.LEFT, padx=8, fill=tk.Y)
+        
+        ttk.Label(frame_acciones, text="Estado:", 
+                  font=('Segoe UI', 10, 'bold')).pack(side=tk.LEFT, padx=(0, 8))
+        
         ttk.Button(frame_acciones, text="✅ Aceptar", 
                    command=lambda: self.cambiar_estado('aceptado')).pack(side=tk.LEFT, padx=3)
-        ttk.Button(frame_acciones, text="📦 → Albarán", 
-                   command=self.crear_albaran_desde_presupuesto).pack(side=tk.LEFT, padx=3)
-        ttk.Button(frame_acciones, text="🧾 → Factura", 
-                   command=self.facturar_documento).pack(side=tk.LEFT, padx=3)
         ttk.Button(frame_acciones, text="💰 Pagado", 
                    command=lambda: self.cambiar_estado('pagado')).pack(side=tk.LEFT, padx=3)
         
-        # === TABLA (centro, ocupa el espacio restante) ===
+        ttk.Separator(frame_acciones, orient='vertical').pack(side=tk.LEFT, padx=8, fill=tk.Y)
+        
+        ttk.Button(frame_acciones, text="🗑️ Eliminar", 
+                   command=self.eliminar_venta).pack(side=tk.LEFT, padx=3)
+        
+        # === TABLA (centro) ===
         frame_tabla = ttk.Frame(self, padding=(10, 0, 10, 0))
         frame_tabla.pack(fill=tk.BOTH, expand=True, side=tk.TOP)
         
-        columns = ('tipo', 'numero', 'fecha', 'cliente', 'total', 'estado')
+        columns = ('cliente', 'total', 'presupuesto', 'albaran', 'factura', 'estado', 'fecha')
         self.tree = ttk.Treeview(frame_tabla, columns=columns, show='headings', height=15)
         
-        self.tree.heading('tipo', text='Tipo')
-        self.tree.heading('numero', text='Número')
-        self.tree.heading('fecha', text='Fecha')
         self.tree.heading('cliente', text='Cliente')
         self.tree.heading('total', text='Total')
+        self.tree.heading('presupuesto', text='Presupuesto')
+        self.tree.heading('albaran', text='Albarán')
+        self.tree.heading('factura', text='Factura')
         self.tree.heading('estado', text='Estado')
+        self.tree.heading('fecha', text='Fecha')
         
-        self.tree.column('tipo', width=100)
-        self.tree.column('numero', width=150)
-        self.tree.column('fecha', width=100)
         self.tree.column('cliente', width=200)
         self.tree.column('total', width=100, anchor='e')
-        self.tree.column('estado', width=100)
+        self.tree.column('presupuesto', width=130, anchor='center')
+        self.tree.column('albaran', width=130, anchor='center')
+        self.tree.column('factura', width=130, anchor='center')
+        self.tree.column('estado', width=130, anchor='center')
+        self.tree.column('fecha', width=90, anchor='center')
         
         scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
@@ -328,90 +330,113 @@ class VentanaHistorial(tk.Toplevel):
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Doble clic para generar PDF
-        self.tree.bind('<Double-1>', lambda e: self.generar_pdf())
+        self.tree.bind('<Double-1>', lambda e: self.ver_detalle_venta())
     
     def cargar_datos(self):
-        """Carga los documentos en la tabla"""
         for item in self.tree.get_children():
             self.tree.delete(item)
         
-        tipo_seleccionado = self.combo_tipo.get()
-        tipo_map = {'Presupuesto': 'presupuesto', 'Albarán': 'albaran', 'Factura': 'factura'}
+        filtro = self.combo_estado.get()
+        estado = filtro.lower() if filtro != 'Todos' else None
         
-        if tipo_seleccionado == 'Todos':
-            for tipo in ['presupuesto', 'albaran', 'factura']:
-                docs = self.db.obtener_documentos_por_tipo(tipo)
-                for doc in docs:
-                    self.insertar_documento(doc)
-        else:
-            tipo = tipo_map.get(tipo_seleccionado)
-            if tipo:
-                docs = self.db.obtener_documentos_por_tipo(tipo)
-                for doc in docs:
-                    self.insertar_documento(doc)
-    
-    def insertar_documento(self, doc):
-        """Inserta un documento en la tabla"""
-        tipos_display = {'presupuesto': '📋 Presupuesto', 'albaran': '📦 Albarán', 'factura': '🧾 Factura'}
-        estados_display = {
-            'pendiente': '⏳ Pendiente',
-            'aceptado': '✅ Aceptado',
-            'rechazado': '❌ Rechazado',
-            'facturado': '🧾 Facturado',
-            'pagado': '💰 Pagado'
-        }
+        ventas = self.db.obtener_ventas(estado)
         
-        self.tree.insert('', tk.END, iid=doc['id'], values=(
-            tipos_display.get(doc['tipo'], doc['tipo']),
-            doc['numero'],
-            doc['fecha_emision'],
-            doc['cliente_nombre'],
-            f"{doc['total']:.2f} €",
-            estados_display.get(doc['estado'], doc['estado'])
-        ), tags=(doc['tipo'],))
+        for v in ventas:
+            pres = v['num_presupuesto'] or '—'
+            alb = v['num_albaran'] or '—'
+            fact = v['num_factura'] or '—'
+            
+            # Marcar con ✓ si tiene el documento
+            pres_display = f"✅ {pres}" if v['num_presupuesto'] else '—'
+            alb_display = f"✅ {alb}" if v['num_albaran'] else '—'
+            fact_display = f"✅ {fact}" if v['num_factura'] else '—'
+            
+            fecha = v['fecha_creacion'][:10] if v['fecha_creacion'] else ''
+            
+            self.tree.insert('', tk.END, iid=v['id'], values=(
+                v['cliente_nombre'],
+                f"{v['total']:.2f} €",
+                pres_display,
+                alb_display,
+                fact_display,
+                self.ESTADOS_DISPLAY.get(v['estado'], v['estado']),
+                fecha
+            ))
     
-    def obtener_documento_seleccionado(self):
-        """Obtiene el documento seleccionado"""
+    def obtener_venta_seleccionada(self):
         seleccion = self.tree.selection()
         if not seleccion:
-            messagebox.showwarning("Aviso", "Selecciona un documento")
+            messagebox.showwarning("Aviso", "Selecciona una venta")
             return None
-        return self.db.obtener_documento(int(seleccion[0]))
+        return self.db.obtener_venta(int(seleccion[0]))
     
     def cambiar_estado(self, nuevo_estado):
-        """Cambia el estado de un documento"""
-        doc = self.obtener_documento_seleccionado()
-        if doc:
-            self.db.actualizar_estado_documento(doc['id'], nuevo_estado)
-            self.cargar_datos()
-            messagebox.showinfo("Éxito", f"Estado actualizado a: {nuevo_estado}")
+        venta = self.obtener_venta_seleccionada()
+        if not venta:
+            return
+        self.db.actualizar_estado_venta(venta['id'], nuevo_estado)
+        self.cargar_datos()
+        messagebox.showinfo("Éxito", f"Estado actualizado a: {nuevo_estado}")
     
-    def generar_pdf(self):
-        """Abre el PDF si ya existe, o lo genera si no"""
-        doc = self.obtener_documento_seleccionado()
-        if not doc:
+    def generar_documento(self, tipo_doc):
+        """Genera (o abre) un documento para la venta seleccionada"""
+        venta = self.obtener_venta_seleccionada()
+        if not venta:
             return
         
-        # Si ya tiene un PDF guardado y el archivo existe, abrirlo directamente
-        ruta_existente = doc.get('ruta_pdf')
-        if ruta_existente and os.path.exists(ruta_existente):
+        # Si ya existe este documento, abrir el PDF
+        doc_existente = venta['documentos'].get(tipo_doc)
+        if doc_existente and doc_existente.get('ruta_pdf') and os.path.exists(doc_existente['ruta_pdf']):
             try:
-                os.startfile(ruta_existente)
+                os.startfile(doc_existente['ruta_pdf'])
                 return
             except Exception:
-                pass  # Si falla, continuar para regenerar
+                pass
         
-        # No existe PDF previo: generar uno nuevo
-        self._generar_nuevo_pdf(doc)
-    
-    def _generar_nuevo_pdf(self, doc):
-        """Genera un nuevo PDF para el documento"""
+        # Validar transiciones lógicas
+        if tipo_doc == 'albaran' and venta['estado'] in ('borrador',):
+            if venta['documentos'].get('presupuesto'):
+                # Tiene presupuesto pero no está aceptado
+                if messagebox.askyesno("Confirmar", 
+                        "La venta no está aceptada. ¿Marcarla como aceptada y generar albarán?"):
+                    self.db.actualizar_estado_venta(venta['id'], 'aceptado')
+                else:
+                    return
+            # Si no tiene presupuesto, se puede generar albarán directamente
+        
+        if tipo_doc == 'factura' and venta['estado'] in ('borrador',):
+            if messagebox.askyesno("Confirmar", 
+                    "La venta está en borrador. ¿Generar factura directamente?"):
+                pass  # Continuar
+            else:
+                return
+        
+        # Generar número y PDF
         config = self.parent.config_manager.config
+        series = {
+            'presupuesto': config.get('serie_presupuesto', 'P'),
+            'albaran': config.get('serie_albaran', 'AL'),
+            'factura': config.get('serie_factura', 'A')
+        }
+        serie = series.get(tipo_doc, 'A')
         
-        items = []
-        for item in doc['items']:
-            items.append({
+        # Si ya tiene número (documento registrado pero sin PDF), reusar
+        if doc_existente and doc_existente.get('numero'):
+            numero = doc_existente['numero']
+            fecha_emision = doc_existente['fecha_emision']
+        else:
+            numero = self.db.generar_numero_documento(tipo_doc, serie)
+            fecha_emision = datetime.now().strftime("%d/%m/%Y")
+        
+        # Fecha validez para presupuestos
+        fecha_validez = None
+        if tipo_doc == 'presupuesto':
+            fecha_validez = (datetime.now() + timedelta(days=30)).strftime("%d/%m/%Y")
+        
+        # Preparar items
+        items_pdf = []
+        for item in venta['items']:
+            items_pdf.append({
                 'descripcion': item['descripcion'],
                 'cantidad': item['cantidad'],
                 'unidad': item.get('unidad', 'unidad'),
@@ -420,99 +445,148 @@ class VentanaHistorial(tk.Toplevel):
                 'subtotal': item['subtotal']
             })
         
-        # Calcular desglose IVA
+        # Desglose IVA
         desglose_iva = {}
-        for item in items:
-            tipo = int(item['iva'])
-            if tipo not in desglose_iva:
-                desglose_iva[tipo] = {'base': 0, 'cuota': 0}
-            desglose_iva[tipo]['base'] += item['subtotal']
-            desglose_iva[tipo]['cuota'] += item['subtotal'] * tipo / 100
+        for item in items_pdf:
+            tipo_iva = int(item['iva'])
+            if tipo_iva not in desglose_iva:
+                desglose_iva[tipo_iva] = {'base': 0, 'cuota': 0}
+            desglose_iva[tipo_iva]['base'] += item['subtotal']
+            desglose_iva[tipo_iva]['cuota'] += item['subtotal'] * tipo_iva / 100
         
         datos_pdf = {
-            'tipo': doc['tipo'],
-            'numero': doc['numero'],
-            'fecha_emision': doc['fecha_emision'],
-            'fecha_validez': doc.get('fecha_validez'),
+            'tipo': tipo_doc,
+            'numero': numero,
+            'fecha_emision': fecha_emision,
+            'fecha_validez': fecha_validez,
             'emisor': config['emisor'],
             'cliente': {
-                'nombre': doc['cliente_nombre'],
-                'nif': doc['cliente_nif'],
-                'direccion': doc.get('cliente_direccion', ''),
-                'codigo_postal': doc.get('cliente_cp', ''),
-                'ciudad': doc.get('cliente_ciudad', ''),
-                'provincia': doc.get('cliente_provincia', '')
+                'nombre': venta['cliente_nombre'],
+                'nif': venta['cliente_nif'],
+                'direccion': venta.get('cliente_direccion', ''),
+                'codigo_postal': venta.get('cliente_cp', ''),
+                'ciudad': venta.get('cliente_ciudad', ''),
+                'provincia': venta.get('cliente_provincia', '')
             },
-            'items': items,
+            'items': items_pdf,
             'totales': {
-                'base_imponible': doc['base_imponible'],
-                'total_iva': doc['total_iva'],
-                'irpf_porcentaje': doc.get('irpf_porcentaje', 0),
-                'total_irpf': doc.get('total_irpf', 0),
-                'total': doc['total'],
+                'base_imponible': venta['base_imponible'],
+                'total_iva': venta['total_iva'],
+                'irpf_porcentaje': venta.get('irpf_porcentaje', 0),
+                'total_irpf': venta.get('total_irpf', 0),
+                'total': venta['total'],
                 'desglose_iva': desglose_iva
             },
-            'metodo_pago': doc.get('metodo_pago', ''),
-            'notas': doc.get('notas', '')
+            'metodo_pago': venta.get('metodo_pago', ''),
+            'notas': venta.get('notas', '')
         }
         
-        # Guardar PDF automáticamente en carpeta organizada
-        ruta = obtener_ruta_documento(doc['tipo'], doc['numero'])
+        ruta = obtener_ruta_documento(tipo_doc, numero)
         
         try:
             generador = GeneradorPDF()
             generador.generar_documento(datos_pdf, ruta)
             
-            # Guardar ruta del PDF en la base de datos
-            self.db.actualizar_ruta_pdf(doc['id'], ruta)
+            # Registrar documento en BD
+            self.db.registrar_documento(
+                venta['id'], tipo_doc, numero, fecha_emision, fecha_validez, ruta)
             
-            messagebox.showinfo("Éxito", f"PDF generado:\n{ruta}")
+            # Actualizar estado de la venta
+            nuevo_estado_map = {
+                'presupuesto': 'presupuestado',
+                'albaran': 'albaranado',
+                'factura': 'facturado'
+            }
+            # Solo avanzar estado, no retroceder
+            estados_orden = Database.ESTADOS
+            estado_actual_idx = estados_orden.index(venta['estado']) if venta['estado'] in estados_orden else 0
+            nuevo_estado = nuevo_estado_map.get(tipo_doc, venta['estado'])
+            nuevo_estado_idx = estados_orden.index(nuevo_estado) if nuevo_estado in estados_orden else 0
+            
+            if nuevo_estado_idx > estado_actual_idx:
+                self.db.actualizar_estado_venta(venta['id'], nuevo_estado)
+            
+            self.cargar_datos()
+            
+            tipos_nombre = {'presupuesto': 'Presupuesto', 'albaran': 'Albarán', 'factura': 'Factura'}
+            messagebox.showinfo("Éxito", 
+                f"{tipos_nombre[tipo_doc]} generado:\n{numero}\n\n{ruta}")
             os.startfile(ruta)
+            
         except Exception as e:
             messagebox.showerror("Error", f"Error al generar PDF:\n{str(e)}")
     
-    def crear_albaran_desde_presupuesto(self):
-        """Crea un albarán a partir de un presupuesto o documento"""
-        doc = self.obtener_documento_seleccionado()
-        if not doc:
+    def eliminar_venta(self):
+        venta = self.obtener_venta_seleccionada()
+        if not venta:
             return
         
-        if doc['tipo'] == 'factura':
-            messagebox.showwarning("Aviso", "No se pueden crear albaranes desde facturas")
+        # Construir info de lo que se va a borrar
+        docs = []
+        for tipo, nombre in [('presupuesto', 'Presupuesto'), ('albaran', 'Albarán'), ('factura', 'Factura')]:
+            if tipo in venta['documentos']:
+                docs.append(f"  • {nombre}: {venta['documentos'][tipo]['numero']}")
+        
+        docs_text = "\n".join(docs) if docs else "  (ninguno)"
+        
+        if not messagebox.askyesno("⚠️ Confirmar eliminación",
+                f"¿Eliminar esta venta y todos sus documentos?\n\n"
+                f"Cliente: {venta['cliente_nombre']}\n"
+                f"Total: {venta['total']:.2f} €\n\n"
+                f"Documentos que se eliminarán:\n{docs_text}\n\n"
+                f"Esta acción no se puede deshacer."):
             return
         
-        if doc['tipo'] == 'presupuesto' and doc['estado'] == 'pendiente':
-            # Preguntar si quiere aceptarlo primero
-            if messagebox.askyesno("Presupuesto pendiente", 
-                                   "El presupuesto está pendiente. ¿Deseas marcarlo como aceptado antes de crear el albarán?"):
-                self.db.actualizar_estado_documento(doc['id'], 'aceptado')
-        
-        # Crear albarán
-        self.parent.cargar_documento_para_nuevo(doc, 'albaran')
-        self.destroy()
+        self.db.eliminar_venta(venta['id'])
+        self.cargar_datos()
+        messagebox.showinfo("Eliminado", "Venta y documentos eliminados correctamente")
     
-    def facturar_documento(self):
-        """Crea una factura a partir de un presupuesto o albarán"""
-        doc = self.obtener_documento_seleccionado()
-        if not doc:
+    def ver_detalle_venta(self):
+        """Muestra detalle de la venta seleccionada"""
+        venta = self.obtener_venta_seleccionada()
+        if not venta:
             return
         
-        if doc['tipo'] == 'factura':
-            messagebox.showwarning("Aviso", "Este documento ya es una factura")
-            return
-        
-        if doc['tipo'] == 'presupuesto' and doc['estado'] == 'pendiente':
-            # Preguntar si quiere aceptarlo primero
-            if messagebox.askyesno("Presupuesto pendiente", 
-                                   "El presupuesto está pendiente. ¿Deseas marcarlo como aceptado antes de facturar?"):
-                self.db.actualizar_estado_documento(doc['id'], 'aceptado')
+        docs_info = []
+        for tipo, nombre in [('presupuesto', 'Presupuesto'), ('albaran', 'Albarán'), ('factura', 'Factura')]:
+            doc = venta['documentos'].get(tipo)
+            if doc:
+                tiene_pdf = "✅ PDF" if doc.get('ruta_pdf') and os.path.exists(doc['ruta_pdf']) else "⚠️ Sin PDF"
+                docs_info.append(f"  {nombre}: {doc['numero']} ({tiene_pdf})")
             else:
-                return
+                docs_info.append(f"  {nombre}: — (no generado)")
         
-        # Crear factura
-        self.parent.cargar_documento_para_nuevo(doc, 'factura')
-        self.destroy()
+        items_info = []
+        for item in venta['items']:
+            items_info.append(
+                f"  • {item['descripcion']}  "
+                f"{item['cantidad']} {item.get('unidad', 'ud')} × {item['precio_unitario']:.2f}€ "
+                f"= {item['subtotal']:.2f}€ (+{int(item['iva_porcentaje'])}% IVA)")
+        
+        detalle = (
+            f"VENTA #{venta['id']}\n"
+            f"{'='*40}\n\n"
+            f"Cliente: {venta['cliente_nombre']} ({venta['cliente_nif']})\n"
+            f"Estado: {self.ESTADOS_DISPLAY.get(venta['estado'], venta['estado'])}\n\n"
+            f"Conceptos:\n" + "\n".join(items_info) + "\n\n"
+            f"Base imponible: {venta['base_imponible']:.2f} €\n"
+            f"IVA: {venta['total_iva']:.2f} €\n"
+        )
+        
+        if venta.get('irpf_porcentaje', 0) > 0:
+            detalle += f"IRPF (-{venta['irpf_porcentaje']:.0f}%): -{venta.get('total_irpf', 0):.2f} €\n"
+        
+        detalle += (
+            f"TOTAL: {venta['total']:.2f} €\n\n"
+            f"Documentos:\n" + "\n".join(docs_info)
+        )
+        
+        messagebox.showinfo(f"Detalle de Venta #{venta['id']}", detalle)
 
+
+# =============================================================================
+# VENTANA SELECCIONAR CLIENTE
+# =============================================================================
 
 class VentanaSeleccionarCliente(tk.Toplevel):
     """Ventana para seleccionar un cliente existente"""
@@ -533,11 +607,9 @@ class VentanaSeleccionarCliente(tk.Toplevel):
         self.grab_set()
     
     def crear_widgets(self):
-        """Crea los widgets"""
         frame = ttk.Frame(self, padding="10")
         frame.pack(fill=tk.BOTH, expand=True)
         
-        # Búsqueda
         frame_busqueda = ttk.Frame(frame)
         frame_busqueda.pack(fill=tk.X, pady=(0, 10))
         
@@ -546,7 +618,6 @@ class VentanaSeleccionarCliente(tk.Toplevel):
         self.entry_busqueda.pack(side=tk.LEFT, padx=5)
         self.entry_busqueda.bind('<KeyRelease>', lambda e: self.filtrar_clientes())
         
-        # Lista de clientes
         columns = ('nombre', 'nif', 'ciudad')
         self.tree = ttk.Treeview(frame, columns=columns, show='headings', height=12)
         
@@ -561,7 +632,6 @@ class VentanaSeleccionarCliente(tk.Toplevel):
         self.tree.pack(fill=tk.BOTH, expand=True)
         self.tree.bind('<Double-1>', lambda e: self.seleccionar())
         
-        # Botones
         frame_botones = ttk.Frame(frame)
         frame_botones.pack(fill=tk.X, pady=10)
         
@@ -569,85 +639,63 @@ class VentanaSeleccionarCliente(tk.Toplevel):
         ttk.Button(frame_botones, text="Cancelar", command=self.destroy).pack(side=tk.LEFT, padx=5)
     
     def cargar_clientes(self):
-        """Carga todos los clientes"""
         self.clientes = self.db.obtener_clientes()
         self.mostrar_clientes(self.clientes)
     
     def mostrar_clientes(self, clientes):
-        """Muestra los clientes en la tabla"""
         for item in self.tree.get_children():
             self.tree.delete(item)
-        
         for cliente in clientes:
             self.tree.insert('', tk.END, iid=cliente['id'], values=(
-                cliente['nombre'],
-                cliente['nif'],
-                cliente.get('ciudad', '')
-            ))
+                cliente['nombre'], cliente['nif'], cliente.get('ciudad', '')))
     
     def filtrar_clientes(self):
-        """Filtra los clientes por texto"""
         texto = self.entry_busqueda.get().lower()
         filtrados = [c for c in self.clientes if 
-                     texto in c['nombre'].lower() or 
-                     texto in c['nif'].lower()]
+                     texto in c['nombre'].lower() or texto in c['nif'].lower()]
         self.mostrar_clientes(filtrados)
     
     def seleccionar(self):
-        """Selecciona el cliente y cierra la ventana"""
         seleccion = self.tree.selection()
         if not seleccion:
             messagebox.showwarning("Aviso", "Selecciona un cliente")
             return
-        
         self.cliente_seleccionado = self.db.obtener_cliente(int(seleccion[0]))
         self.destroy()
 
+
+# =============================================================================
+# APLICACIÓN PRINCIPAL
+# =============================================================================
 
 class AplicacionFacturador(tk.Tk):
     """Aplicación principal de facturación"""
     
     UNIDADES = ['unidad', 'hora', 'servicio', 'día', 'mes', 'kg', 'm²', 'proyecto']
-    
-    # Usamos temas nativos de ttk que son rápidos
-    # 'clam' es moderno y rápido, disponible en todas las plataformas
-    # 'vista'/'winnative' son buenos en Windows pero pueden no estar disponibles
     TEMAS_PREFERIDOS = ['vista', 'winnative', 'clam', 'alt', 'default']
     
     def __init__(self):
         super().__init__()
         
-        # Aplicar tema nativo (no usamos ttkthemes, son muy lentos)
         self.aplicar_tema_nativo()
         
-        self.title("Facturador España v2.0")
+        self.title("Facturador España v3.0")
         self.geometry("1000x800")
         
-        # Configurar estilos personalizados
         self.configurar_estilos()
         
-        # Configuración y base de datos
         self.config_manager = ConfigManager()
         self.db = Database()
         
-        # Tipo de documento actual
-        self.tipo_documento = tk.StringVar(value='factura')
-        
-        # Items del documento
+        # Items del documento actual
         self.items = []
-        
-        # Documento origen (para flujo presupuesto -> albarán -> factura)
-        self.documento_origen_id = None
-        self.documento_origen_numero = None
         
         self.crear_menu()
         self.crear_widgets()
     
     def aplicar_tema_nativo(self):
-        """Aplica un tema nativo de ttk (rápido y sin dependencias)"""
         style = ttk.Style()
         temas_disponibles = style.theme_names()
-        
         for tema in self.TEMAS_PREFERIDOS:
             if tema in temas_disponibles:
                 try:
@@ -655,66 +703,45 @@ class AplicacionFacturador(tk.Tk):
                     return
                 except Exception:
                     continue
-        
-        # Fallback al tema por defecto
-        if 'clam' in temas_disponibles:
-            style.theme_use('clam')
     
     def configurar_estilos(self):
-        """Configura estilos personalizados para mejorar la apariencia"""
         style = ttk.Style()
-        
-        # Configurar fuentes más grandes y legibles
         style.configure('TLabel', font=('Segoe UI', 10))
         style.configure('TButton', font=('Segoe UI', 10), padding=6)
         style.configure('TEntry', font=('Segoe UI', 10), padding=4)
         style.configure('TCombobox', font=('Segoe UI', 10))
         style.configure('TRadiobutton', font=('Segoe UI', 10))
-        style.configure('TCheckbutton', font=('Segoe UI', 10))
-        
-        # Estilo para LabelFrames
         style.configure('TLabelframe', font=('Segoe UI', 10, 'bold'))
         style.configure('TLabelframe.Label', font=('Segoe UI', 10, 'bold'))
-        
-        # Estilo para el Treeview
         style.configure('Treeview', font=('Segoe UI', 10), rowheight=28)
         style.configure('Treeview.Heading', font=('Segoe UI', 10, 'bold'))
-        
-        # Estilo para botones grandes/importantes
         style.configure('Accent.TButton', font=('Segoe UI', 11, 'bold'), padding=10)
-        
-        # Estilo para etiquetas de título
         style.configure('Title.TLabel', font=('Segoe UI', 12, 'bold'))
         style.configure('Subtitle.TLabel', font=('Segoe UI', 11))
         style.configure('Total.TLabel', font=('Segoe UI', 13, 'bold'))
     
     def crear_menu(self):
-        """Crea el menú de la aplicación"""
         menubar = tk.Menu(self)
         self.config(menu=menubar)
         
         # Menú Archivo
         menu_archivo = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Archivo", menu=menu_archivo)
-        menu_archivo.add_command(label="Nuevo Documento", command=self.nuevo_documento)
+        menu_archivo.add_command(label="Nueva Venta", command=self.nuevo_documento)
         menu_archivo.add_separator()
         menu_archivo.add_command(label="Salir", command=self.salir)
         
-        # Menú Ver
-        menu_ver = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Ver", menu=menu_ver)
-        menu_ver.add_command(label="Todos los documentos", 
-                             command=lambda: self.abrir_historial())
-        menu_ver.add_separator()
-        menu_ver.add_command(label="Presupuestos", 
-                             command=lambda: self.abrir_historial('presupuesto'))
-        menu_ver.add_command(label="Albaranes", 
-                             command=lambda: self.abrir_historial('albaran'))
-        menu_ver.add_command(label="Facturas", 
-                             command=lambda: self.abrir_historial('factura'))
-        menu_ver.add_separator()
-        menu_ver.add_command(label="Pendientes de facturar", 
-                             command=self.ver_pendientes_facturar)
+        # Menú Ventas
+        menu_ventas = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Ventas", menu=menu_ventas)
+        menu_ventas.add_command(label="📋 Todas las ventas", command=lambda: self.abrir_ventas())
+        menu_ventas.add_separator()
+        menu_ventas.add_command(label="📝 Borradores", command=lambda: self.abrir_ventas('borrador'))
+        menu_ventas.add_command(label="📋 Presupuestadas", command=lambda: self.abrir_ventas('presupuestado'))
+        menu_ventas.add_command(label="✅ Aceptadas", command=lambda: self.abrir_ventas('aceptado'))
+        menu_ventas.add_command(label="📦 Albaranadas", command=lambda: self.abrir_ventas('albaranado'))
+        menu_ventas.add_command(label="🧾 Facturadas", command=lambda: self.abrir_ventas('facturado'))
+        menu_ventas.add_command(label="💰 Pagadas", command=lambda: self.abrir_ventas('pagado'))
         
         # Menú Configuración
         menu_config = tk.Menu(menubar, tearoff=0)
@@ -722,33 +749,18 @@ class AplicacionFacturador(tk.Tk):
         menu_config.add_command(label="Datos del Emisor", command=self.abrir_configuracion)
     
     def crear_widgets(self):
-        """Crea los widgets principales"""
-        # Frame principal con scroll
         main_frame = ttk.Frame(self, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # === Selector de tipo de documento ===
-        frame_tipo = ttk.LabelFrame(main_frame, text="Tipo de Documento", padding="10")
-        frame_tipo.pack(fill=tk.X, pady=(0, 10))
-        
-        ttk.Radiobutton(frame_tipo, text="📋 Presupuesto", variable=self.tipo_documento, 
-                        value='presupuesto').pack(side=tk.LEFT, padx=20)
-        ttk.Radiobutton(frame_tipo, text="📦 Albarán", variable=self.tipo_documento, 
-                        value='albaran').pack(side=tk.LEFT, padx=20)
-        ttk.Radiobutton(frame_tipo, text="🧾 Factura", variable=self.tipo_documento, 
-                        value='factura').pack(side=tk.LEFT, padx=20)
         
         # === Sección Cliente ===
         frame_cliente = ttk.LabelFrame(main_frame, text="Datos del Cliente", padding="10")
         frame_cliente.pack(fill=tk.X, pady=(0, 10))
         
-        # Botón para seleccionar cliente existente
         frame_cliente_acciones = ttk.Frame(frame_cliente)
         frame_cliente_acciones.pack(fill=tk.X, pady=(0, 10))
         ttk.Button(frame_cliente_acciones, text="📂 Seleccionar Cliente Existente", 
                    command=self.seleccionar_cliente).pack(side=tk.LEFT)
         
-        # Grid para datos del cliente
         campos_cliente = [
             ("Nombre/Razón Social:", "nombre"),
             ("NIF/CIF:", "nif"),
@@ -775,7 +787,6 @@ class AplicacionFacturador(tk.Tk):
         frame_items = ttk.LabelFrame(main_frame, text="Conceptos/Items", padding="10")
         frame_items.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
         
-        # Frame para añadir items
         frame_add_item = ttk.Frame(frame_items)
         frame_add_item.pack(fill=tk.X, pady=(0, 10))
         
@@ -829,7 +840,6 @@ class AplicacionFacturador(tk.Tk):
         self.tree_items.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Botón eliminar item
         frame_acciones_items = ttk.Frame(main_frame)
         frame_acciones_items.pack(fill=tk.X, pady=(0, 10))
         ttk.Button(frame_acciones_items, text="🗑️ Eliminar Item Seleccionado", 
@@ -839,7 +849,6 @@ class AplicacionFacturador(tk.Tk):
         frame_totales = ttk.LabelFrame(main_frame, text="Totales", padding="10")
         frame_totales.pack(fill=tk.X, pady=(0, 10))
         
-        # IRPF
         frame_irpf = ttk.Frame(frame_totales)
         frame_irpf.pack(fill=tk.X, pady=(0, 10))
         
@@ -852,7 +861,6 @@ class AplicacionFacturador(tk.Tk):
         ttk.Label(frame_irpf, text="(Ej: 15% para profesionales)", 
                   font=('Segoe UI', 8)).pack(side=tk.LEFT, padx=10)
         
-        # Totales
         frame_valores = ttk.Frame(frame_totales)
         frame_valores.pack(fill=tk.X)
         
@@ -879,11 +887,6 @@ class AplicacionFacturador(tk.Tk):
         self.combo_pago.set('Transferencia bancaria')
         self.combo_pago.pack(side=tk.LEFT, padx=5)
         
-        ttk.Label(frame_opciones, text="Validez (días):").pack(side=tk.LEFT, padx=15)
-        self.entry_validez = ttk.Entry(frame_opciones, width=5)
-        self.entry_validez.insert(0, "30")
-        self.entry_validez.pack(side=tk.LEFT, padx=5)
-        
         # Notas
         frame_notas = ttk.Frame(main_frame)
         frame_notas.pack(fill=tk.X, pady=(0, 10))
@@ -892,101 +895,32 @@ class AplicacionFacturador(tk.Tk):
         self.entry_notas = ttk.Entry(frame_notas, width=80)
         self.entry_notas.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
         
-        # === Botones principales ===
+        # === Botón principal ===
         frame_generar = ttk.Frame(main_frame)
         frame_generar.pack(fill=tk.X, pady=10)
         
-        ttk.Button(frame_generar, text="💾 GUARDAR Y GENERAR PDF", 
-                   command=self.guardar_y_generar, style='Accent.TButton').pack(pady=10)
+        ttk.Button(frame_generar, text="💾 CREAR VENTA", 
+                   command=self.guardar_venta, style='Accent.TButton').pack(pady=10)
+    
+    # === ACCIONES ===
     
     def abrir_configuracion(self):
-        """Abre la ventana de configuración"""
         VentanaConfiguracion(self, self.config_manager)
     
-    def abrir_historial(self, tipo=None):
-        """Abre el historial de documentos"""
-        VentanaHistorial(self, self.db, tipo)
-    
-    def ver_pendientes_facturar(self):
-        """Muestra los documentos pendientes de facturar"""
-        docs = self.db.obtener_documentos_pendientes_facturar()
-        if not docs:
-            messagebox.showinfo("Info", "No hay documentos pendientes de facturar")
-            return
-        self.abrir_historial()
+    def abrir_ventas(self, estado=None):
+        VentanaVentas(self, self.db, estado)
     
     def seleccionar_cliente(self):
-        """Abre la ventana para seleccionar un cliente"""
         ventana = VentanaSeleccionarCliente(self, self.db)
         self.wait_window(ventana)
         
         if ventana.cliente_seleccionado:
             cliente = ventana.cliente_seleccionado
-            self.cliente_entries['nombre'].delete(0, tk.END)
-            self.cliente_entries['nombre'].insert(0, cliente['nombre'])
-            self.cliente_entries['nif'].delete(0, tk.END)
-            self.cliente_entries['nif'].insert(0, cliente['nif'])
-            self.cliente_entries['direccion'].delete(0, tk.END)
-            self.cliente_entries['direccion'].insert(0, cliente.get('direccion', ''))
-            self.cliente_entries['codigo_postal'].delete(0, tk.END)
-            self.cliente_entries['codigo_postal'].insert(0, cliente.get('codigo_postal', ''))
-            self.cliente_entries['ciudad'].delete(0, tk.END)
-            self.cliente_entries['ciudad'].insert(0, cliente.get('ciudad', ''))
-            self.cliente_entries['provincia'].delete(0, tk.END)
-            self.cliente_entries['provincia'].insert(0, cliente.get('provincia', ''))
-    
-    def cargar_documento_para_nuevo(self, doc_origen, nuevo_tipo):
-        """Carga un documento existente para crear uno nuevo"""
-        # Limpiar
-        self.nuevo_documento()
-        
-        # Establecer tipo
-        self.tipo_documento.set(nuevo_tipo)
-        
-        # Cargar datos del cliente
-        self.cliente_entries['nombre'].insert(0, doc_origen['cliente_nombre'])
-        self.cliente_entries['nif'].insert(0, doc_origen['cliente_nif'])
-        self.cliente_entries['direccion'].insert(0, doc_origen.get('cliente_direccion', ''))
-        self.cliente_entries['codigo_postal'].insert(0, doc_origen.get('cliente_cp', ''))
-        self.cliente_entries['ciudad'].insert(0, doc_origen.get('cliente_ciudad', ''))
-        self.cliente_entries['provincia'].insert(0, doc_origen.get('cliente_provincia', ''))
-        
-        # Cargar items
-        for item in doc_origen['items']:
-            self.items.append({
-                'descripcion': item['descripcion'],
-                'cantidad': item['cantidad'],
-                'unidad': item.get('unidad', 'unidad'),
-                'precio_unitario': item['precio_unitario'],
-                'iva': item['iva_porcentaje'],
-                'subtotal': item['subtotal']
-            })
-            
-            self.tree_items.insert('', tk.END, values=(
-                item['descripcion'],
-                f"{item['cantidad']:.2f}",
-                item.get('unidad', 'unidad'),
-                f"{item['precio_unitario']:.2f} €",
-                f"{item['iva_porcentaje']}%",
-                f"{item['subtotal']:.2f} €"
-            ))
-        
-        # Cargar IRPF
-        self.entry_irpf.delete(0, tk.END)
-        self.entry_irpf.insert(0, str(int(doc_origen.get('irpf_porcentaje', 0))))
-        
-        # Guardar referencia al documento origen
-        self.documento_origen_id = doc_origen['id']
-        self.documento_origen_numero = doc_origen['numero']
-        
-        self.actualizar_totales()
-        
-        messagebox.showinfo("Info", 
-            f"Datos cargados desde {doc_origen['tipo']} {doc_origen['numero']}.\n"
-            f"Revisa y genera el nuevo {nuevo_tipo}.")
+            for campo in ['nombre', 'nif', 'direccion', 'codigo_postal', 'ciudad', 'provincia']:
+                self.cliente_entries[campo].delete(0, tk.END)
+                self.cliente_entries[campo].insert(0, cliente.get(campo, ''))
     
     def añadir_item(self):
-        """Añade un item al documento"""
         descripcion = self.entry_descripcion.get().strip()
         if not descripcion:
             messagebox.showwarning("Aviso", "Introduce una descripción")
@@ -1003,27 +937,15 @@ class AplicacionFacturador(tk.Tk):
         unidad = self.combo_unidad.get() or 'unidad'
         subtotal = cantidad * precio
         
-        item = {
-            'descripcion': descripcion,
-            'cantidad': cantidad,
-            'unidad': unidad,
-            'precio_unitario': precio,
-            'iva': iva,
-            'subtotal': subtotal
-        }
-        
-        self.items.append(item)
+        self.items.append({
+            'descripcion': descripcion, 'cantidad': cantidad, 'unidad': unidad,
+            'precio_unitario': precio, 'iva': iva, 'subtotal': subtotal
+        })
         
         self.tree_items.insert('', tk.END, values=(
-            descripcion,
-            f"{cantidad:.2f}",
-            unidad,
-            f"{precio:.2f} €",
-            f"{iva}%",
-            f"{subtotal:.2f} €"
-        ))
+            descripcion, f"{cantidad:.2f}", unidad,
+            f"{precio:.2f} €", f"{iva}%", f"{subtotal:.2f} €"))
         
-        # Limpiar campos
         self.entry_descripcion.delete(0, tk.END)
         self.entry_cantidad.delete(0, tk.END)
         self.entry_cantidad.insert(0, "1")
@@ -1032,19 +954,16 @@ class AplicacionFacturador(tk.Tk):
         self.actualizar_totales()
     
     def eliminar_item(self):
-        """Elimina el item seleccionado"""
         seleccion = self.tree_items.selection()
         if not seleccion:
             messagebox.showwarning("Aviso", "Selecciona un item para eliminar")
             return
-        
         index = self.tree_items.index(seleccion[0])
         del self.items[index]
         self.tree_items.delete(seleccion[0])
         self.actualizar_totales()
     
     def actualizar_totales(self):
-        """Actualiza los totales del documento"""
         base_imponible = sum(item['subtotal'] for item in self.items)
         total_iva = sum(item['subtotal'] * item['iva'] / 100 for item in self.items)
         
@@ -1062,65 +981,39 @@ class AplicacionFacturador(tk.Tk):
         self.label_total.config(text=f"TOTAL: {total:.2f} €")
     
     def nuevo_documento(self):
-        """Limpia todo para un nuevo documento"""
         for entry in self.cliente_entries.values():
             entry.delete(0, tk.END)
-        
         self.items = []
         for item in self.tree_items.get_children():
             self.tree_items.delete(item)
-        
         self.entry_irpf.delete(0, tk.END)
         self.entry_irpf.insert(0, str(self.config_manager.config.get("irpf_por_defecto", 0)))
-        
         self.entry_notas.delete(0, tk.END)
-        
-        # Limpiar referencia a documento origen
-        self.documento_origen_id = None
-        self.documento_origen_numero = None
-        
         self.actualizar_totales()
     
     def validar_datos(self):
-        """Valida que todos los datos necesarios estén completos"""
         emisor = self.config_manager.config.get("emisor", {})
         if not emisor.get("nombre") or not emisor.get("nif"):
             messagebox.showerror("Error", 
                 "Configura los datos del emisor primero\n(Menú Configuración > Datos del Emisor)")
             return False
-        
         if not self.cliente_entries['nombre'].get().strip():
             messagebox.showerror("Error", "El nombre del cliente es obligatorio")
             return False
         if not self.cliente_entries['nif'].get().strip():
             messagebox.showerror("Error", "El NIF/CIF del cliente es obligatorio")
             return False
-        
         if not self.items:
             messagebox.showerror("Error", "Añade al menos un concepto")
             return False
-        
         return True
     
-    def guardar_y_generar(self):
-        """Guarda el documento en la base de datos y genera el PDF"""
+    def guardar_venta(self):
+        """Crea una nueva venta en la base de datos"""
         if not self.validar_datos():
             return
         
-        tipo = self.tipo_documento.get()
         config = self.config_manager.config
-        
-        # Obtener serie según tipo
-        series = {
-            'presupuesto': config.get('serie_presupuesto', 'P'),
-            'albaran': config.get('serie_albaran', 'AL'),
-            'factura': config.get('serie_factura', 'A')
-        }
-        serie = series.get(tipo, 'A')
-        
-        # Generar número
-        numero = self.db.generar_numero_documento(tipo, serie)
-        fecha_actual = datetime.now().strftime("%d/%m/%Y")
         
         # Calcular totales
         base_imponible = sum(item['subtotal'] for item in self.items)
@@ -1134,15 +1027,6 @@ class AplicacionFacturador(tk.Tk):
         total_irpf = base_imponible * irpf_porcentaje / 100
         total = base_imponible + total_iva - total_irpf
         
-        # Fecha de validez para presupuestos
-        fecha_validez = None
-        if tipo == 'presupuesto':
-            try:
-                dias_validez = int(self.entry_validez.get())
-                fecha_validez = (datetime.now() + timedelta(days=dias_validez)).strftime("%d/%m/%Y")
-            except ValueError:
-                fecha_validez = (datetime.now() + timedelta(days=30)).strftime("%d/%m/%Y")
-        
         # Guardar cliente
         cliente_data = {
             'nombre': self.cliente_entries['nombre'].get().strip(),
@@ -1154,12 +1038,8 @@ class AplicacionFacturador(tk.Tk):
         }
         cliente_id = self.db.guardar_cliente(cliente_data)
         
-        # Preparar datos del documento
-        documento_data = {
-            'tipo': tipo,
-            'numero': numero,
-            'fecha_emision': fecha_actual,
-            'fecha_validez': fecha_validez,
+        # Crear venta
+        venta_data = {
             'cliente_id': cliente_id,
             'cliente_nombre': cliente_data['nombre'],
             'cliente_nif': cliente_data['nif'],
@@ -1173,80 +1053,27 @@ class AplicacionFacturador(tk.Tk):
             'total_irpf': total_irpf,
             'total': total,
             'metodo_pago': self.combo_pago.get(),
-            'estado': 'pendiente',
-            'documento_origen_id': self.documento_origen_id,
-            'notas': self.entry_notas.get().strip()
+            'notas': self.entry_notas.get().strip(),
+            'estado': 'borrador'
         }
         
-        # Guardar en base de datos
-        documento_id = self.db.guardar_documento(documento_data, self.items)
+        venta_id = self.db.crear_venta(venta_data, self.items)
         
-        # Si viene de otro documento, marcar el origen como facturado
-        if self.documento_origen_id:
-            self.db.actualizar_estado_documento(self.documento_origen_id, 'facturado')
+        messagebox.showinfo("Éxito", 
+            f"Venta #{venta_id} creada correctamente.\n\n"
+            f"Cliente: {cliente_data['nombre']}\n"
+            f"Total: {total:.2f} €\n\n"
+            "Ve a Ventas para generar presupuesto, albarán o factura.")
         
-        # Desglose de IVA
-        desglose_iva = {}
-        for item in self.items:
-            tipo_iva = item['iva']
-            if tipo_iva not in desglose_iva:
-                desglose_iva[tipo_iva] = {'base': 0, 'cuota': 0}
-            desglose_iva[tipo_iva]['base'] += item['subtotal']
-            desglose_iva[tipo_iva]['cuota'] += item['subtotal'] * tipo_iva / 100
+        # Preguntar qué hacer
+        if messagebox.askyesno("Generar documento", 
+                "¿Quieres abrir la ventana de ventas para generar un documento?"):
+            self.abrir_ventas()
         
-        # Preparar datos para PDF
-        datos_pdf = {
-            'tipo': tipo,
-            'numero': numero,
-            'fecha_emision': fecha_actual,
-            'fecha_validez': fecha_validez,
-            'fecha_operacion': fecha_actual,
-            'emisor': config['emisor'],
-            'cliente': cliente_data,
-            'items': self.items,
-            'totales': {
-                'base_imponible': base_imponible,
-                'total_iva': total_iva,
-                'irpf_porcentaje': irpf_porcentaje,
-                'total_irpf': total_irpf,
-                'total': total,
-                'desglose_iva': desglose_iva
-            },
-            'metodo_pago': self.combo_pago.get(),
-            'notas': self.entry_notas.get().strip()
-        }
-        
-        if self.documento_origen_numero:
-            datos_pdf['documento_origen'] = self.documento_origen_numero
-        
-        # Generar PDF automáticamente en carpeta organizada
-        tipos_nombre = {'presupuesto': 'Presupuesto', 'albaran': 'Albarán', 'factura': 'Factura'}
-        ruta = obtener_ruta_documento(tipo, numero)
-        
-        try:
-            generador = GeneradorPDF()
-            generador.generar_documento(datos_pdf, ruta)
-            
-            # Guardar ruta del PDF en la base de datos
-            self.db.actualizar_ruta_pdf(documento_id, ruta)
-            
-            messagebox.showinfo("Éxito", 
-                f"{tipos_nombre.get(tipo, 'Documento')} guardado correctamente.\n\n"
-                f"Número: {numero}\n"
-                f"PDF: {ruta}")
-            
-            if messagebox.askyesno("Abrir PDF", "¿Deseas abrir el PDF?"):
-                os.startfile(ruta)
-            
-            # Limpiar para nuevo documento
-            if messagebox.askyesno("Nuevo documento", "¿Crear un nuevo documento?"):
-                self.nuevo_documento()
-                
-        except Exception as e:
-            messagebox.showerror("Error", f"Error al generar PDF:\n{str(e)}")
+        if messagebox.askyesno("Nueva venta", "¿Crear una nueva venta?"):
+            self.nuevo_documento()
     
     def salir(self):
-        """Cierra la aplicación"""
         self.db.cerrar()
         self.quit()
 

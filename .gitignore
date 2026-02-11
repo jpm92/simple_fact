@@ -1,0 +1,35 @@
+# === Datos personales y documentos generados ===
+config.json
+facturador.db
+Documentos/
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+
+# === Entornos virtuales ===
+venv/
+env/
+.venv/
+.env/
+
+# === IDEs y editores ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === OS ===
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# === Distribución y build ===
+dist/
+build/
+*.egg-info/
+*.spec
